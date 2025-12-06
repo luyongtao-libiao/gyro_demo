@@ -16,7 +16,7 @@
   *
   *        http://www.st.com/software_license_agreement_liberty_v2
   *
-  * Unless required by applicable law or agreed to in writing, software 
+  * Unless required by applicable law or agreed in writing, software 
   * distributed under the License is distributed on an "AS IS" BASIS, 
   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   * See the License for the specific language governing permissions and
@@ -40,6 +40,7 @@ SPI_HandleTypeDef hspi2;
 
 /* Global variables ----------------------------------------------------------*/
 XV7011_Data_t g_xv7011_data;
+float g_temperature;
 
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
@@ -186,6 +187,9 @@ static void Gyro_Task(void const *argument)
 {
 	(void) argument;
 	
+	/* Initialize global temperature variable */
+	g_temperature = 0.0f;
+	
 	/* Initialize XV7011 gyroscope sensor */
 	if (XV7011_Init() == 0) {
 		/* Initialization successful */
@@ -202,6 +206,14 @@ static void Gyro_Task(void const *argument)
 	{
 		/* Read all XV7011 data (angular rate and temperature) */
 		XV7011_ReadAllData(&g_xv7011_data);
+		
+		/* Integrate angular rate to calculate angle offset */
+		/* Angular rate unit: бу/s, Task period: 10ms = 0.01s */
+		/* Angle offset = angular_rate * dt * 4 */
+		float angle_offset = g_xv7011_data.angular_rate * 0.01f * 4.0f;  // бу/s * 0.01s * 4 = degrees
+		
+		/* Accumulate angle offset to global temperature variable */
+		g_temperature += angle_offset;
 		
 		/* Task period: 10ms */
 		osDelay(10);
