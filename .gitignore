@@ -1,3 +1,9 @@
+.vs
+.vscode
+.visualgdb
+Debug
+TraceReports
+
 # Prerequisites
 *.d
 
