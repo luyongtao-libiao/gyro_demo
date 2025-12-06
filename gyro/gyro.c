@@ -32,6 +32,12 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
+#define GYRO_TASK_PERIOD_MS     10      // Gyro任务周期 (ms)
+#define GYRO_TASK_PERIOD_S      (GYRO_TASK_PERIOD_MS / 1000.0f)  // Gyro任务周期 (s)
+#define GYRO_CALIBRATION_TOTAL_SAMPLES    1000  // 校准总采样次数
+#define GYRO_CALIBRATION_SKIP_SAMPLES     500   // 跳过前N个采样点
+#define GYRO_CALIBRATION_VALID_SAMPLES (GYRO_CALIBRATION_TOTAL_SAMPLES - GYRO_CALIBRATION_SKIP_SAMPLES)  // 有效采样点数
+
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 osThreadId LEDThread2Handle;
@@ -41,6 +47,8 @@ SPI_HandleTypeDef hspi2;
 /* Global variables ----------------------------------------------------------*/
 XV7011_Data_t g_xv7011_data;
 float g_temperature;
+float g_angle_offset = 0.0f;  // 角度偏移值（上电自动归零）
+uint8_t g_gyro_calibration_flag = 1;  // 陀螺仪校准标志：1=需要校准, 0=正常运行
 
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
@@ -187,8 +195,10 @@ static void Gyro_Task(void const *argument)
 {
 	(void) argument;
 	
-	/* Initialize global temperature variable */
+	/* Initialize global variables */
 	g_temperature = 0.0f;
+	g_angle_offset = 0.0f;
+	g_gyro_calibration_flag = 1;  // Start with calibration
 	
 	/* Initialize XV7011 gyroscope sensor */
 	if (XV7011_Init() == 0) {
@@ -201,22 +211,61 @@ static void Gyro_Task(void const *argument)
 		}
 	}
 	
+	/* Calibration variables */
+	float angular_rate_sum = 0.0f;  // 角速度累加和（用于计算零偏）
+	uint16_t calibration_count = 0;
+	
 	/* Main task loop */
 	for (;;)
 	{
 		/* Read all XV7011 data (angular rate and temperature) */
 		XV7011_ReadAllData(&g_xv7011_data);
 		
-		/* Integrate angular rate to calculate angle offset */
-		/* Angular rate unit: °/s, Task period: 10ms = 0.01s */
-		/* Angle offset = angular_rate * dt * 4 */
-		float angle_offset = g_xv7011_data.angular_rate * 0.01f * 4.0f;  // °/s * 0.01s * 4 = degrees
+		/* Check if calibration is needed */
+		if (g_gyro_calibration_flag == 1)
+		{
+			calibration_count++;
+			
+			/* Only use samples after skipping the first N samples */
+			if (calibration_count > GYRO_CALIBRATION_SKIP_SAMPLES)
+			{
+				/* Calibration mode: collect angular rate samples to calculate zero bias */
+				angular_rate_sum += g_xv7011_data.angular_rate;
+			}
+			
+			/* Check if calibration is complete */
+			if (calibration_count >= GYRO_CALIBRATION_TOTAL_SAMPLES)
+			{
+				/* Calculate average angular rate (zero bias) using valid samples */
+				g_angle_offset = angular_rate_sum / GYRO_CALIBRATION_VALID_SAMPLES;
+				
+				/* Reset g_temperature to 0 (this is the zero reference point) */
+				g_temperature = 0.0f;
+				
+				/* Reset calibration variables */
+				angular_rate_sum = 0.0f;
+				calibration_count = 0;
+				
+				/* Clear calibration flag */
+				g_gyro_calibration_flag = 0;
+			}
+		}
+		else
+		{
+			/* Normal operation mode: calculate angle with zero bias compensation */
+			/* Subtract zero bias from angular rate before integration */
+			float compensated_rate = g_xv7011_data.angular_rate - g_angle_offset;
+			
+			/* Integrate compensated angular rate to get angle */
+			/* Angular rate unit: °/s, Task period: GYRO_TASK_PERIOD_MS ms */
+			float angle_delta = compensated_rate * GYRO_TASK_PERIOD_S * 4.0f;  // °/s * s * 4 = degrees
+			
+			/* Accumulate angle */
+			g_temperature += angle_delta;
+		}
 		
-		/* Accumulate angle offset to global temperature variable */
-		g_temperature += angle_offset;
-		
-		/* Task period: 10ms */
-		osDelay(10);
+		/* Task period */
+		osDelay(GYRO_TASK_PERIOD_MS);
 	}
 }
 
