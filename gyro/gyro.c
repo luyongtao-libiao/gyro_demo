@@ -36,9 +36,62 @@
 osThreadId LEDThread2Handle;
 
 /* Private function prototypes -----------------------------------------------*/
+static void SystemClock_Config(void);
 static void LED_Thread2(void const *argument);
 
 /* Private functions ---------------------------------------------------------*/
+
+/**
+  * @brief  System Clock Configuration
+  * The system Clock is configured as follow : 
+  *            System Clock source        = PLL (HSE)
+  *     SYSCLK(Hz)      = 72000000
+  *            HCLK(Hz)  = 72000000
+  *       AHB Prescaler            = 1
+  * APB1 Prescaler                 = 2
+  *            APB2 Prescaler      = 1
+  *HSE Frequency(Hz)         = 8000000
+  *            HSE PREDIV     = 1
+  *      PLLMUL        = 9
+  * Flash Latency(WS)          = 2
+  * @param  None
+  * @retval None
+  */
+static void SystemClock_Config(void)
+{
+	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+	/** Initializes the RCC Oscillators according to the specified parameters
+	* in the RCC_OscInitTypeDef structure.
+	*/
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+	RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+	RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+	RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9; // 8MHz * 9 = 72MHz
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+	{
+		// Error Handler
+		while(1);
+	}
+
+	/** Initializes the CPU, AHB and APB buses clocks
+	*/
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+	            | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;   // 72MHz
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;    // 36MHz (APB1 max 36MHz)
+	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1; // 72MHz
+
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+	{
+		// Error Handler
+		while(1);
+	}
+}
 
 /**
   * @brief  Main program
@@ -54,6 +107,9 @@ int main(void)
        - Global MSP (MCU Support Package) initialization
      */
 	HAL_Init();  
+	
+	/* Configure the system clock to 72 MHz */
+	SystemClock_Config();
 	
 	__GPIOB_CLK_ENABLE();
 	GPIO_InitTypeDef GPIO_InitStructure;
