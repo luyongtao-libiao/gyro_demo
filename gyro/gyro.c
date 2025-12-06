@@ -28,6 +28,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include <stm32f1xx_hal.h>
 #include <../CMSIS_RTOS/cmsis_os.h>
+#include "xv7011.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -37,13 +38,15 @@ osThreadId LEDThread2Handle;
 osThreadId GyroThreadHandle;
 SPI_HandleTypeDef hspi2;
 
+/* Global variables ----------------------------------------------------------*/
+XV7011_Data_t g_xv7011_data;
+
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
 static void LED_Thread2(void const *argument);
 static void Gyro_Task(void const *argument);
 static void SPI2_Init(void);
 static void SPI2_CS_Init(void);
-static uint8_t test_spi(uint8_t reg_addr);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -182,55 +185,27 @@ static void LED_Thread2(void const *argument)
 static void Gyro_Task(void const *argument)
 {
 	(void) argument;
-	uint8_t reg_value = 0;
 	
+	/* Initialize XV7011 gyroscope sensor */
+	if (XV7011_Init() == 0) {
+		/* Initialization successful */
+		osDelay(100);
+	} else {
+		/* Initialization failed - error handler */
+		while(1) {
+			osDelay(1000);
+		}
+	}
+	
+	/* Main task loop */
 	for (;;)
 	{
-		/* Test SPI communication - Read register 0x0B */
-		reg_value = test_spi(0x0B);
-		
-		/* TODO: Process the register value */
-		/* You can check the value or use it for further processing */
+		/* Read all XV7011 data (angular rate and temperature) */
+		XV7011_ReadAllData(&g_xv7011_data);
 		
 		/* Task period: 10ms */
 		osDelay(10);
 	}
-}
-
-/**
-  * @brief  Test SPI communication by reading a register
-  * @param  reg_addr: Register address to read (1 byte: 0x00 - 0xFF)
-  * @retval Register value (1 byte)
-  * @note   Standard SPI read protocol:
-  *     - Byte 1: Send (address | 0x80), Receive garbage
-  *         - Byte 2: Send dummy (0x00), Receive register value
-  */
-static uint8_t test_spi(uint8_t reg_addr)
-{
-	uint8_t tx_data[2];
-	uint8_t rx_data[2];
-	
-	/* Prepare read command: set MSB to 1 for read operation */
-	tx_data[0] = reg_addr | 0x80;  // 0x80 = read bit (address is 1 byte)
-	tx_data[1] = 0x00;         // Dummy byte to clock out register data
-	
-	/* Pull CS low to select the device */
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
-	
-	/* Small delay for CS setup time (optional, depends on device) */
-	for (volatile int i = 0; i < 10; i++);
-	
-	/* SPI transaction: 2 bytes total
-	 * TX: [addr|0x80] [0x00]
-	 * RX: [garbage]   [register_value]
-	 */
-	HAL_SPI_TransmitReceive(&hspi2, tx_data, rx_data, 2, 100);
-	
-	/* Pull CS high to deselect the device */
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
-	
-	/* Return the received data (second byte contains register value) */
-	return rx_data[1];
 }
 
 /**

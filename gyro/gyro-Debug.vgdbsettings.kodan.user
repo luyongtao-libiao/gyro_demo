@@ -12,7 +12,19 @@
     <VisualWatchPreferences />
     <MaskInterruptsWhileStepping>false</MaskInterruptsWhileStepping>
     <MemoryWindowPreferences />
-    <LiveVariables />
+    <LiveVariables>
+      <LiveVariable>
+        <Expression>g_xv7011_data</Expression>
+        <Enabled>true</Enabled>
+        <Breakpoint>
+          <ComparisonMode>Equals</ComparisonMode>
+          <Enabled>false</Enabled>
+        </Breakpoint>
+        <Plot>false</Plot>
+        <IsCollapsed>false</IsCollapsed>
+        <IsFavorite>false</IsFavorite>
+      </LiveVariable>
+    </LiveVariables>
     <LoadGlobalsWithoutConfirmation>false</LoadGlobalsWithoutConfirmation>
     <NestedLiveVariables>
       <NestedVariableSettingsCollection>

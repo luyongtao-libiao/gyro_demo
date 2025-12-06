@@ -58,6 +58,8 @@
   <ItemGroup>
     <ClCompile Include="gyro.c" />
     <ClCompile Include="system_stm32f1xx.c" />
+    <ClCompile Include="xv7011.c" />
+    <ClInclude Include="xv7011.h" />
     <None Include="stm32.props" />
     <ClCompile Include="$(BSP_ROOT)\STM32F1xxxx\StartupFiles\startup_stm32f103xb.c" />
     <ClCompile Include="$(BSP_ROOT)\FreeRTOS\Source\croutine.c" />
